@@ -5,16 +5,16 @@ from typing import List, Tuple
 DB_PATH = "users.db"
 
 
-async def async_fetch_users(db_path: str) -> List[Tuple]:
+async def async_fetch_users() -> List[Tuple]:
     """Fetch all users asynchronously."""
-    async with aiosqlite.connect(db_path) as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT * FROM users") as cursor:
             return await cursor.fetchall()
 
 
-async def async_fetch_older_users(db_path: str, age_threshold: int = 40) -> List[Tuple]:
+async def async_fetch_older_users(age_threshold: int = 40) -> List[Tuple]:
     """Fetch users older than the provided age threshold."""
-    async with aiosqlite.connect(db_path) as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
             "SELECT * FROM users WHERE age > ?", (age_threshold,)
         ) as cursor:
@@ -24,8 +24,8 @@ async def async_fetch_older_users(db_path: str, age_threshold: int = 40) -> List
 async def fetch_concurrently() -> None:
     """Run user queries concurrently and print the results."""
     all_users, older_users = await asyncio.gather(
-        async_fetch_users(DB_PATH),
-        async_fetch_older_users(DB_PATH),
+        async_fetch_users(),
+        async_fetch_older_users(),
     )
 
     print("All users:")

@@ -12,11 +12,14 @@ async def async_fetch_users() -> List[Tuple]:
             return await cursor.fetchall()
 
 
-async def async_fetch_older_users(age_threshold: int = 40) -> List[Tuple]:
+AGE_THRESHOLD = 40
+
+
+async def async_fetch_older_users() -> List[Tuple]:
     """Fetch users older than the provided age threshold."""
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT * FROM users WHERE age > ?", (age_threshold,)
+            "SELECT * FROM users WHERE age > ?", (AGE_THRESHOLD,)
         ) as cursor:
             return await cursor.fetchall()
 

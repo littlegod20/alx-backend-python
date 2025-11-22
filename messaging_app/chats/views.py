@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from .models import Chat, Message
 from .serializers import ChatSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
+from .pagination import StandardResultsSetPagination
 
 
 class ChatViewSet(viewsets.ModelViewSet):
@@ -18,6 +19,7 @@ class ChatViewSet(viewsets.ModelViewSet):
     queryset = Chat.objects.all()
     serializer_class = ChatSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """
@@ -46,6 +48,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """

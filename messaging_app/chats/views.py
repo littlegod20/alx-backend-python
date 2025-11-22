@@ -1,15 +1,16 @@
 from django.shortcuts import render
 from django.db import models
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 from .models import Chat, Message
 from .serializers import ChatSerializer, MessageSerializer
-from .permissions import IsChatParticipant, IsMessageParticipant, CanSendMessage
+from .permissions import IsParticipantOfConversation
 
 
 class ChatViewSet(viewsets.ModelViewSet):
     queryset = Chat.objects.all()
     serializer_class = ChatSerializer
-    permission_classes = [IsChatParticipant]
+    permission_classes = [IsParticipantOfConversation]
     
     def get_queryset(self):
         """
@@ -26,7 +27,7 @@ class ChatViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    permission_classes = [IsMessageParticipant, CanSendMessage]
+    permission_classes = [IsParticipantOfConversation]
     
     def get_queryset(self):
         """
@@ -42,5 +43,13 @@ class MessageViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """
         Automatically set the sender to the current user when creating a message.
+        Also verify that the user is a participant in the chat they're sending to.
         """
+        chat_id = serializer.validated_data.get('chat')
+        if chat_id:
+            chat = chat_id if isinstance(chat_id, Chat) else Chat.objects.get(pk=chat_id)
+            # Check if user is a participant in the chat
+            if self.request.user != chat.user1 and self.request.user != chat.user2:
+                raise PermissionDenied("You can only send messages to conversations you are part of.")
+        
         serializer.save(sender=self.request.user)

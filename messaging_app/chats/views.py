@@ -8,6 +8,11 @@ from .permissions import IsParticipantOfConversation
 
 
 class ChatViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing Chat objects.
+    Uses IsParticipantOfConversation permission to ensure only authenticated
+    users who are participants in a conversation can access chats.
+    """
     queryset = Chat.objects.all()
     serializer_class = ChatSerializer
     permission_classes = [IsParticipantOfConversation]
@@ -25,6 +30,11 @@ class ChatViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing Message objects.
+    Uses IsParticipantOfConversation permission to ensure only authenticated
+    users who are participants in a conversation can send, view, update, and delete messages.
+    """
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [IsParticipantOfConversation]

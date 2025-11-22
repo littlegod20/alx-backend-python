@@ -13,11 +13,11 @@ class IsParticipantOfConversation(permissions.BasePermission):
         Check if the user is authenticated.
         For POST requests (creating messages), also verify the user is a participant in the chat.
         """
-        # First check if user is authenticated
+       
         if not (request.user and request.user.is_authenticated):
             return False
         
-        # For message creation, check if user is a participant in the chat
+
         if request.method == 'POST' and hasattr(view, 'get_serializer_class'):
             # Check if this is a MessageViewSet
             if hasattr(view, 'queryset') and view.queryset.model.__name__ == 'Message':
@@ -31,21 +31,37 @@ class IsParticipantOfConversation(permissions.BasePermission):
                     except Chat.DoesNotExist:
                         return False
         
+
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            return True
+        
         return True
     
     def has_object_permission(self, request, view, obj):
         """
         Check if the user is a participant in the conversation (chat).
         This applies to object-level operations (retrieve, update, delete).
+        Explicitly handles PUT, PATCH, and DELETE methods.
         """
-        # For Message objects, check if user is participant in the message's chat
-        if hasattr(obj, 'chat'):
-            chat = obj.chat
-            is_participant = request.user == chat.user1 or request.user == chat.user2
-            return is_participant
+
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            if hasattr(obj, 'chat'):
+                chat = obj.chat
+                is_participant = request.user == chat.user1 or request.user == chat.user2
+                if request.method == 'DELETE':
+                    return is_participant
+                return is_participant
+            
+            if hasattr(obj, 'user1') and hasattr(obj, 'user2'):
+                return request.user == obj.user1 or request.user == obj.user2
         
-        # For Chat objects, check if user is a participant
-        if hasattr(obj, 'user1') and hasattr(obj, 'user2'):
-            return request.user == obj.user1 or request.user == obj.user2
+        if request.method in permissions.SAFE_METHODS:
+            if hasattr(obj, 'chat'):
+                chat = obj.chat
+                is_participant = request.user == chat.user1 or request.user == chat.user2
+                return is_participant
+            
+            if hasattr(obj, 'user1') and hasattr(obj, 'user2'):
+                return request.user == obj.user1 or request.user == obj.user2
         
         return False

@@ -11,7 +11,7 @@ class IsParticipantOfConversation(permissions.BasePermission):
     def has_permission(self, request, view):
         """
         Check if the user is authenticated.
-        For POST requests (creating messages), also verify the user is a participant in the chat.
+        For POST requests (creating messages), also verify the user is a participant in the conversation.
         """
        
         if not (request.user and request.user.is_authenticated):
@@ -24,29 +24,27 @@ class IsParticipantOfConversation(permissions.BasePermission):
     
     def has_object_permission(self, request, view, obj):
         """
-        Check if the user is a participant in the conversation (chat).
+        Check if the user is a participant in the conversation.
         This applies to object-level operations (retrieve, update, delete).
         Explicitly handles PUT, PATCH, and DELETE methods.
         """
+        user = request.user
 
-        if request.method in ['PUT', 'PATCH', 'DELETE']:
-            if hasattr(obj, 'chat'):
-                chat = obj.chat
-                is_participant = request.user == chat.user1 or request.user == chat.user2
-                if request.method == 'DELETE':
-                    return is_participant
+        # Handle Message objects
+        if hasattr(obj, 'conversation'):
+            conversation = obj.conversation
+            is_participant = user in conversation.participants.all()
+            if request.method in ['PUT', 'PATCH', 'DELETE']:
                 return is_participant
-            
-            if hasattr(obj, 'user1') and hasattr(obj, 'user2'):
-                return request.user == obj.user1 or request.user == obj.user2
+            if request.method in permissions.SAFE_METHODS:
+                return is_participant
         
-        if request.method in permissions.SAFE_METHODS:
-            if hasattr(obj, 'chat'):
-                chat = obj.chat
-                is_participant = request.user == chat.user1 or request.user == chat.user2
+        # Handle Conversation objects
+        if hasattr(obj, 'participants'):
+            is_participant = user in obj.participants.all()
+            if request.method in ['PUT', 'PATCH', 'DELETE']:
                 return is_participant
-            
-            if hasattr(obj, 'user1') and hasattr(obj, 'user2'):
-                return request.user == obj.user1 or request.user == obj.user2
+            if request.method in permissions.SAFE_METHODS:
+                return is_participant
         
         return False

@@ -64,12 +64,19 @@ class MessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filter messages to only show those from conversations where the current user is a participant.
-        Optionally filter by conversation_id if provided.
+        If accessed via nested route, filter by conversation_id from URL kwargs.
+        Optionally filter by conversation_id if provided as query parameter.
         """
         user = self.request.user
         if user.is_authenticated:
             queryset = Message.objects.filter(conversation__participants=user)
-            # Apply additional filters from filter_backends
+            
+            # Handle nested route: /api/chats/{conversation_id}/messages/
+            conversation_id = self.kwargs.get('conversation_pk')
+            if conversation_id:
+                queryset = queryset.filter(conversation_id=conversation_id)
+            
+            
             queryset = self.filter_queryset(queryset)
             return queryset
         return Message.objects.none()

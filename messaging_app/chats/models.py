@@ -131,7 +131,9 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name='messages',
         db_column='conversation_id',
-        db_index=True
+        db_index=True,
+        null=True,  # Temporarily nullable for migration
+        blank=True
     )
     message_body = models.TextField(null=False, blank=False)
     sent_at = models.DateTimeField(auto_now_add=True, db_index=True)

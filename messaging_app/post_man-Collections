@@ -1,0 +1,150 @@
+
+
+
+//====Testing jwt token login====
+// http://localhost:8000/api/token/
+// --------user1--------
+{
+    "username": "theo",
+    "password": "admin"
+}
+// response:
+{
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NDY4NzYyLCJpYXQiOjE3Mzc0NjgxNjIsInVzZXJfaWQiOjF9.a6Y7-mKk9KHf-aUWQ_J0y-Bh9-_qYk0c_q5g65wT_4",
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczNzU1NDU2MiwiaWF0IjoxNzM3NDY4MTYyLCJ1c2VyX2lkIjoxfQ.Dx5pQ41n0k0xYI5g_gG314CwWgSg1_g-Rc19L0Uq_4"
+}
+
+
+// --------user2--------
+{
+    "username": "alice",
+    "password": "testpassword"
+}
+// response:
+{
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NDY4NzYyLCJpYXQiOjE3Mzc0NjgxNjIsInVzZXJfaWQiOjJ9.h35HjP-p575KQoD5oX_3PZpQ8YKz3eOq8V72kHh3zU4",
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczNzU1NDU2MiwiaWF0IjoxNzM3NDY4MTYyLCJ1c2VyX2lkIjoyfQ.hjJL2qS4i_yqR-6Pn3FhQzPZB85gZ593090qZ-592"
+}
+
+// Creating a chat between two users
+// localhost:8000/api/chats/ (POST)
+{
+    "user1":1, // theo's id
+    "user2":3 // alice's id
+}
+
+// response:
+{
+    "id": 8,
+    "created_at": "2025-11-23T14:31:33.784584Z",
+    "updated_at": "2025-11-23T14:31:33.784584Z",
+    "user1": 1,
+    "user2": 3
+}
+
+// --------------------------CHATS--------------------------
+// --------Sending a message between user1 and user2--------
+// http://localhost:8000/api/messages/ POST
+// Authorization: Bearer <token_of_sender>
+{
+    "sender":1,
+    "receiver":3,
+    "chat":8,
+    "content":"Bob has travelled, he's not in Ghana"
+}
+// response:
+{
+    "id": 9,
+    "content": "Bob has travelled, he's not in Ghana",
+    "created_at": "2025-11-23T14:35:45.519187Z",
+    "chat": 8,
+    "sender": 1,
+    "receiver": 3
+}
+
+
+// --------Getting all messages for a chat-------
+// http://localhost:8000/api/messages/ GET
+// Authorization: Bearer <token>
+{
+    "count": 6,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 5,
+            "content": "Alice I need a favor",
+            "created_at": "2025-11-23T14:33:16.597877Z",
+            "chat": 8,
+            "sender": 1,
+            "receiver": 3
+        },
+        {
+            "id": 6,
+            "content": "Hello Theo I'm a little busy",
+            "created_at": "2025-11-23T14:34:29.561131Z",
+            "chat": 8,
+            "sender": 3,
+            "receiver": 1
+        },
+        {
+            "id": 7,
+            "content": "Okay, when will you be free though?",
+            "created_at": "2025-11-23T14:34:57.974169Z",
+            "chat": 8,
+            "sender": 1,
+            "receiver": 3
+        },
+        {
+            "id": 8,
+            "content": "Don't really know, unless but you can ask bob, he's free",
+            "created_at": "2025-11-23T14:35:20.936855Z",
+            "chat": 8,
+            "sender": 3,
+            "receiver": 1
+        },
+        {
+            "id": 9,
+            "content": "Bob has travelled, he's not in Ghana",
+            "created_at": "2025-11-23T14:35:45.519187Z",
+            "chat": 8,
+            "sender": 1,
+            "receiver": 3
+        },
+        {
+            "id": 10,
+            "content": "Oh really? I didn't know that. He didn't tell me either",
+            "created_at": "2025-11-23T14:36:07.684442Z",
+            "chat": 8,
+            "sender": 3,
+            "receiver": 1
+        }
+    ]
+}
+
+
+// ==========unauthorized users test=========
+
+// getting token for bob
+// POST localhost:8000/api/token/
+{"username": "bob", "password": "testpass123"}
+
+// response: 
+{
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2Mzk5NTQ5OCwiaWF0IjoxNzYzOTA5MDk4LCJqdGkiOiI4M2E3MzAzMTcyYjY0NTNjOTAxOWIyYzdhZjA0OTY4OSIsInVzZXJfaWQiOiI0In0.S8LMA5OlgZ2BA0cHcqy5C8QIZQrLbgiq-wwNQSHBItw",
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzOTA5Mzk4LCJpYXQiOjE3NjM5MDkwOTgsImp0aSI6IjU2NTFmMmI2ODYyNzQ2ZmI5MTQzMTg5ZGQxMDNlNjgzIiwidXNlcl9pZCI6IjQifQ.jx1_DgKl3VI9_mJPdU7UpMj2XZEERBgD_eT9nzkAK9o"
+}
+
+// bob tries to send a message in chat 8 ( theo and alice's chat )
+// POST localhost:8000/api/messages/
+{
+    "sender":4,
+    "receiver":1,
+    "chat":8,
+    "content":"Hello guys, this is Bob. I just came back yesterday."
+}
+
+// response:
+{
+    "detail": "You can only send messages to conversations you are part of. Chat theo - alice has participants: theo and alice, but you are bob."
+}

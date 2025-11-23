@@ -76,14 +76,20 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         chat_id = serializer.validated_data.get('chat')
-        conversation_id = request.data.get('conversation_id') or chat_id
+        conversation_id = request.data.get('chat_id') or chat_id
         
         if conversation_id:
-            chat = conversation_id if isinstance(conversation_id, Chat) else Chat.objects.get(pk=conversation_id)
-            if self.request.user != chat.user1 and self.request.user != chat.user2:
+            try:
+                chat = conversation_id if isinstance(conversation_id, Chat) else Chat.objects.get(pk=conversation_id)
+                if self.request.user != chat.user1 and self.request.user != chat.user2:
+                    return Response(
+                        {"detail": f"You can only send messages to conversations you are part of. Chat {conversation_id} has participants: {chat.user1.username} and {chat.user2.username}, but you are {self.request.user.username}."},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except Chat.DoesNotExist:
                 return Response(
-                    {"detail": "You can only send messages to conversations you are part of."},
-                    status=status.HTTP_403_FORBIDDEN
+                    {"detail": f"Chat with id {conversation_id} does not exist."},
+                    status=status.HTTP_404_NOT_FOUND
                 )
         
         self.perform_create(serializer)

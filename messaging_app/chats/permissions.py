@@ -16,21 +16,6 @@ class IsParticipantOfConversation(permissions.BasePermission):
        
         if not (request.user and request.user.is_authenticated):
             return False
-        
-
-        if request.method == 'POST' and hasattr(view, 'get_serializer_class'):
-            # Check if this is a MessageViewSet
-            if hasattr(view, 'queryset') and view.queryset.model.__name__ == 'Message':
-                chat_id = request.data.get('chat')
-                if chat_id:
-                    from .models import Chat
-                    try:
-                        chat = Chat.objects.get(pk=chat_id)
-                        is_participant = request.user == chat.user1 or request.user == chat.user2
-                        return is_participant
-                    except Chat.DoesNotExist:
-                        return False
-        
 
         if request.method in ['PUT', 'PATCH', 'DELETE']:
             return True

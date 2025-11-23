@@ -56,4 +56,3 @@ class TestGithubOrgClient(unittest.TestCase):
             self.assertEqual(result, expected_repos)
             mock_get_json.assert_called_once_with(test_url)
             mock_repos_url.assert_called_once()
-

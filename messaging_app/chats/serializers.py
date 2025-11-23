@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+# ValidationError is available as serializers.ValidationError for validation methods
+serializers.ValidationError = ValidationError
+
 from .models import Conversation, Message, User
 
 
@@ -37,9 +40,9 @@ class MessageSerializer(serializers.ModelSerializer):
     def validate_message_body(self, value):
         """Validate message body is not empty"""
         if not value or not value.strip():
-            raise ValidationError("Message body cannot be empty.")
+            raise serializers.ValidationError("Message body cannot be empty.")
         if len(value.strip()) > 10000:
-            raise ValidationError("Message body is too long. Maximum 10000 characters allowed.")
+            raise serializers.ValidationError("Message body is too long. Maximum 10000 characters allowed.")
         return value.strip()
 
 
@@ -79,7 +82,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     def validate_participants(self, value):
         """Validate participants list"""
         if not value:
-            raise ValidationError("A conversation must have at least one participant.")
+            raise serializers.ValidationError("A conversation must have at least one participant.")
         if len(value) < 1:
-            raise ValidationError("A conversation must have at least one participant.")
+            raise serializers.ValidationError("A conversation must have at least one participant.")
         return value

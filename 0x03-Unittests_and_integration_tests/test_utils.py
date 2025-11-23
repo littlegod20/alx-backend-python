@@ -36,12 +36,12 @@ class TestGetJson(unittest.TestCase):
     """Test class for get_json function.
 
     """
-    @patch('utils.requests.get')
     @parameterized.expand([
         ("http://example.com", {"payload": True}),
         ("http://holberton.io", {"payload": False}),
     ])
-    def test_get_json(self, mock_get, test_url, test_payload):
+    @patch('utils.requests.get')
+    def test_get_json(self, test_url, test_payload, mock_get):
         """Test get_json returns expected result."""
         mock_response = Mock()
         mock_response.json.return_value = test_payload

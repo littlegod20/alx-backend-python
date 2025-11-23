@@ -16,6 +16,12 @@ class User(AbstractUser):
     Custom User model extending AbstractUser.
     Includes additional fields: phone_number and role.
     Uses UUID as primary key.
+    
+    Inherited fields from AbstractUser/AbstractBaseUser:
+    - password: CharField (max_length=128) - password hash stored automatically by Django
+    - username: CharField (overridden to be optional)
+    - email: EmailField (overridden to be required and unique)
+    - first_name, last_name: CharField (overridden to be required)
     """
     user_id = models.UUIDField(
         primary_key=True,
@@ -26,6 +32,8 @@ class User(AbstractUser):
     first_name = models.CharField(max_length=150, null=False, blank=False)
     last_name = models.CharField(max_length=150, null=False, blank=False)
     email = models.EmailField(unique=True, null=False, blank=False, db_index=True)
+    # password field is inherited from AbstractBaseUser (via AbstractUser)
+    # It's a CharField(max_length=128) that stores the password hash
     phone_number = models.CharField(
         max_length=20,
         null=True,
@@ -46,7 +54,7 @@ class User(AbstractUser):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Override username to make it optional since we're using email
+
     username = models.CharField(
         max_length=150,
         unique=True,

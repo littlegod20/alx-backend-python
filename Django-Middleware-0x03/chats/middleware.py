@@ -131,4 +131,34 @@ class OffensiveLanguageMiddleware:
         # For non-POST requests or non-message endpoints, process normally
         response = self.get_response(request)
         return response
+
+
+class RolePermissionMiddleware:
+    """Middleware to check user role permissions.
+
+    """
+    def __init__(self, get_response):
+        """Initialize the middleware."""
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """Check user role and deny access if not admin or moderator."""
+        # Check if user is authenticated
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            # Get user role
+            user_role = getattr(request.user, 'role', None)
+            
+            # Check if user is admin or moderator
+            # Allow access only if user has admin or moderator role
+            if user_role not in ['admin', 'moderator']:
+                return HttpResponseForbidden(
+                    "Access denied. Only administrators or moderators can access "
+                    "this resource."
+                )
+        
+        # Process the request if user is admin/moderator or not authenticated
+        # (unauthenticated users will be handled by authentication middleware)
+        response = self.get_response(request)
+        
+        return response
         

@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 
 
 
-class ChatViewSet(viewsets.ModelViewSet):
+class ConversationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Conversation objects.
     Uses IsParticipantOfConversation permission to ensure only authenticated

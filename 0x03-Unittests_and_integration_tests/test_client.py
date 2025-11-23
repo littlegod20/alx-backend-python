@@ -86,7 +86,7 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
                 return cls.repos_payload
             return None
 
-        cls.get_patcher = patch('utils.requests.get')
+        cls.get_patcher = patch('requests.get')
         cls.mock_get = cls.get_patcher.start()
 
         def side_effect(url):

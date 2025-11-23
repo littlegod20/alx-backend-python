@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
+from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
@@ -18,6 +19,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
     pagination_class = StandardResultsSetPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['participants__email', 'participants__first_name', 'participants__last_name']
+    ordering_fields = ['created_at', 'conversation_id']
+    ordering = ['-created_at']
     
     def get_queryset(self):
         """
@@ -27,12 +32,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated:
             queryset = Conversation.objects.filter(participants=user)
-            # Filter by conversation_id if provided as query parameter
-            conversation_id = self.request.query_params.get('conversation_id')
-            if conversation_id:
-                queryset = queryset.filter(pk=conversation_id)
+            # Apply additional filters from filter_backends
+            queryset = self.filter_queryset(queryset)
             return queryset
         return Conversation.objects.none()
+    
+    def perform_create(self, serializer):
+        """
+        Create a new conversation and automatically add the current user as a participant.
+        """
+        conversation = serializer.save()
+        # Add the creator as a participant
+        conversation.participants.add(self.request.user)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -45,6 +56,10 @@ class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
     pagination_class = StandardResultsSetPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['message_body', 'sender__email', 'sender__first_name', 'sender__last_name']
+    ordering_fields = ['sent_at', 'message_id', 'conversation']
+    ordering = ['-sent_at']
     
     def get_queryset(self):
         """
@@ -54,10 +69,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated:
             queryset = Message.objects.filter(conversation__participants=user)
-            # Filter by conversation_id if provided as query parameter
-            conversation_id = self.request.query_params.get('conversation_id')
-            if conversation_id:
-                queryset = queryset.filter(conversation_id=conversation_id)
+            # Apply additional filters from filter_backends
+            queryset = self.filter_queryset(queryset)
             return queryset
         return Message.objects.none()
     

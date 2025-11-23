@@ -1,6 +1,5 @@
 
 
-
 //====Testing jwt token login====
 // http://localhost:8000/api/token/
 // --------user1--------
@@ -26,98 +25,115 @@
     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczNzU1NDU2MiwiaWF0IjoxNzM3NDY4MTYyLCJ1c2VyX2lkIjoyfQ.hjJL2qS4i_yqR-6Pn3FhQzPZB85gZ593090qZ-592"
 }
 
-// Creating a chat between two users
-// localhost:8000/api/chats/ (POST)
+// Creating a conversation between two users
+// POST http://localhost:8000/api/chats/
+// Authorization: Bearer <token>
 {
-    "user1":1, // theo's id
-    "user2":3 // alice's id
+    "participants": ["<user1_uuid>", "<user2_uuid>"]
+}
+// Note: Replace <user1_uuid> and <user2_uuid> with actual UUIDs from your database
+// Example with UUIDs:
+{
+    "participants": ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"]
 }
 
 // response:
 {
-    "id": 8,
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440008",
     "created_at": "2025-11-23T14:31:33.784584Z",
-    "updated_at": "2025-11-23T14:31:33.784584Z",
-    "user1": 1,
-    "user2": 3
+    "participants": ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"],
+    "participant_emails": ["theo@example.com", "alice@example.com"],
+    "participant_names": ["Theo User", "Alice User"],
+    "messages": [],
+    "message_count": 0
 }
 
-// --------------------------CHATS--------------------------
-// --------Sending a message between user1 and user2--------
-// http://localhost:8000/api/messages/ POST
+// --------------------------MESSAGES--------------------------
+// --------Sending a message in a conversation--------
+// POST http://localhost:8000/api/messages/
 // Authorization: Bearer <token_of_sender>
 {
-    "sender":1,
-    "receiver":3,
-    "chat":8,
-    "content":"Bob has travelled, he's not in Ghana"
+    "conversation": "550e8400-e29b-41d4-a716-446655440008",
+    "message_body": "Bob has travelled, he's not in Ghana"
 }
+// Note: sender is automatically set from the authenticated user token
+
 // response:
 {
-    "id": 9,
-    "content": "Bob has travelled, he's not in Ghana",
-    "created_at": "2025-11-23T14:35:45.519187Z",
-    "chat": 8,
-    "sender": 1,
-    "receiver": 3
+    "message_id": "550e8400-e29b-41d4-a716-446655440009",
+    "message_body": "Bob has travelled, he's not in Ghana",
+    "sent_at": "2025-11-23T14:35:45.519187Z",
+    "conversation": "550e8400-e29b-41d4-a716-446655440008",
+    "sender": "550e8400-e29b-41d4-a716-446655440000",
+    "sender_email": "theo@example.com",
+    "sender_name": "Theo User"
 }
 
 
-// --------Getting all messages for a chat-------
-// http://localhost:8000/api/messages/ GET
+// --------Getting all messages for a conversation-------
+// GET http://localhost:8000/api/messages/?conversation=<conversation_id>
+// OR
+// GET http://localhost:8000/api/chats/<conversation_id>/messages/
 // Authorization: Bearer <token>
+// response:
 {
     "count": 6,
     "next": null,
     "previous": null,
     "results": [
         {
-            "id": 5,
-            "content": "Alice I need a favor",
-            "created_at": "2025-11-23T14:33:16.597877Z",
-            "chat": 8,
-            "sender": 1,
-            "receiver": 3
+            "message_id": "550e8400-e29b-41d4-a716-446655440005",
+            "message_body": "Alice I need a favor",
+            "sent_at": "2025-11-23T14:33:16.597877Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440000",
+            "sender_email": "theo@example.com",
+            "sender_name": "Theo User"
         },
         {
-            "id": 6,
-            "content": "Hello Theo I'm a little busy",
-            "created_at": "2025-11-23T14:34:29.561131Z",
-            "chat": 8,
-            "sender": 3,
-            "receiver": 1
+            "message_id": "550e8400-e29b-41d4-a716-446655440006",
+            "message_body": "Hello Theo I'm a little busy",
+            "sent_at": "2025-11-23T14:34:29.561131Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440001",
+            "sender_email": "alice@example.com",
+            "sender_name": "Alice User"
         },
         {
-            "id": 7,
-            "content": "Okay, when will you be free though?",
-            "created_at": "2025-11-23T14:34:57.974169Z",
-            "chat": 8,
-            "sender": 1,
-            "receiver": 3
+            "message_id": "550e8400-e29b-41d4-a716-446655440007",
+            "message_body": "Okay, when will you be free though?",
+            "sent_at": "2025-11-23T14:34:57.974169Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440000",
+            "sender_email": "theo@example.com",
+            "sender_name": "Theo User"
         },
         {
-            "id": 8,
-            "content": "Don't really know, unless but you can ask bob, he's free",
-            "created_at": "2025-11-23T14:35:20.936855Z",
-            "chat": 8,
-            "sender": 3,
-            "receiver": 1
+            "message_id": "550e8400-e29b-41d4-a716-446655440008",
+            "message_body": "Don't really know, unless but you can ask bob, he's free",
+            "sent_at": "2025-11-23T14:35:20.936855Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440001",
+            "sender_email": "alice@example.com",
+            "sender_name": "Alice User"
         },
         {
-            "id": 9,
-            "content": "Bob has travelled, he's not in Ghana",
-            "created_at": "2025-11-23T14:35:45.519187Z",
-            "chat": 8,
-            "sender": 1,
-            "receiver": 3
+            "message_id": "550e8400-e29b-41d4-a716-446655440009",
+            "message_body": "Bob has travelled, he's not in Ghana",
+            "sent_at": "2025-11-23T14:35:45.519187Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440000",
+            "sender_email": "theo@example.com",
+            "sender_name": "Theo User"
         },
         {
-            "id": 10,
-            "content": "Oh really? I didn't know that. He didn't tell me either",
-            "created_at": "2025-11-23T14:36:07.684442Z",
-            "chat": 8,
-            "sender": 3,
-            "receiver": 1
+            "message_id": "550e8400-e29b-41d4-a716-446655440010",
+            "message_body": "Oh really? I didn't know that. He didn't tell me either",
+            "sent_at": "2025-11-23T14:36:07.684442Z",
+            "conversation": "550e8400-e29b-41d4-a716-446655440008",
+            "sender": "550e8400-e29b-41d4-a716-446655440001",
+            "sender_email": "alice@example.com",
+            "sender_name": "Alice User"
         }
     ]
 }
@@ -126,8 +142,11 @@
 // ==========unauthorized users test=========
 
 // getting token for bob
-// POST localhost:8000/api/token/
-{"username": "bob", "password": "testpass123"}
+// POST http://localhost:8000/api/token/
+{
+    "username": "bob",
+    "password": "testpass123"
+}
 
 // response: 
 {
@@ -135,16 +154,15 @@
     "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzOTA5Mzk4LCJpYXQiOjE3NjM5MDkwOTgsImp0aSI6IjU2NTFmMmI2ODYyNzQ2ZmI5MTQzMTg5ZGQxMDNlNjgzIiwidXNlcl9pZCI6IjQifQ.jx1_DgKl3VI9_mJPdU7UpMj2XZEERBgD_eT9nzkAK9o"
 }
 
-// bob tries to send a message in chat 8 ( theo and alice's chat )
-// POST localhost:8000/api/messages/
+// bob tries to send a message in conversation (theo and alice's conversation)
+// POST http://localhost:8000/api/messages/
+// Authorization: Bearer <bob_token>
 {
-    "sender":4,
-    "receiver":1,
-    "chat":8,
-    "content":"Hello guys, this is Bob. I just came back yesterday."
+    "conversation": "550e8400-e29b-41d4-a716-446655440008",
+    "message_body": "Hello guys, this is Bob. I just came back yesterday."
 }
 
 // response:
 {
-    "detail": "You can only send messages to conversations you are part of. Chat theo - alice has participants: theo and alice, but you are bob."
+    "detail": "You can only send messages to conversations you are part of. Conversation has participants: theo and alice, but you are bob."
 }

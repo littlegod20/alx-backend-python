@@ -2,8 +2,9 @@
 """Middleware for logging user requests and restricting access by time.
 
 """
-from datetime import datetime
-from django.http import HttpResponseForbidden
+from datetime import datetime, timedelta
+from django.http import HttpResponseForbidden, HttpResponseTooManyRequests
+import threading
 
 
 class RequestLoggingMiddleware:
@@ -61,5 +62,73 @@ class RestrictAccessByTimeMiddleware:
         # Process the request if within allowed hours
         response = self.get_response(request)
         
+        return response
+
+
+class OffensiveLanguageMiddleware:
+    """Middleware to limit message sending rate per IP address.
+
+    """
+    def __init__(self, get_response):
+        """Initialize the middleware."""
+        self.get_response = get_response
+        self.max_messages = 5  # Maximum messages allowed
+        self.time_window = timedelta(minutes=1)  # Time window (1 minute)
+        self.ip_requests = {}  # Dictionary to store IP addresses and timestamps
+        self.lock = threading.Lock()  # Lock for thread-safe access
+
+    def _get_client_ip(self, request):
+        """Get the client IP address from the request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def _clean_old_requests(self, ip, current_time):
+        """Remove timestamps older than the time window."""
+        if ip in self.ip_requests:
+            cutoff_time = current_time - self.time_window
+            self.ip_requests[ip] = [
+                timestamp for timestamp in self.ip_requests[ip]
+                if timestamp > cutoff_time
+            ]
+            # Remove IP if no requests remain
+            if not self.ip_requests[ip]:
+                del self.ip_requests[ip]
+
+    def __call__(self, request):
+        """Check message rate limit for POST requests to message endpoints."""
+        # Only check POST requests to message endpoints
+        if request.method == 'POST' and '/messages' in request.path:
+            current_time = datetime.now()
+            client_ip = self._get_client_ip(request)
+            
+            # Thread-safe access to ip_requests dictionary
+            with self.lock:
+                # Clean old requests for this IP
+                self._clean_old_requests(client_ip, current_time)
+                
+                # Check if IP exists in dictionary
+                if client_ip not in self.ip_requests:
+                    self.ip_requests[client_ip] = []
+                
+                # Check if limit is exceeded
+                if len(self.ip_requests[client_ip]) >= self.max_messages:
+                    return HttpResponseTooManyRequests(
+                        "Rate limit exceeded. You can only send "
+                        f"{self.max_messages} messages per minute."
+                    )
+                
+                # Add current request timestamp
+                self.ip_requests[client_ip].append(current_time)
+            
+            # Process the request if within limit
+            response = self.get_response(request)
+            return response
+        
+        # For non-POST requests or non-message endpoints, process normally
+        response = self.get_response(request)
         return response
         

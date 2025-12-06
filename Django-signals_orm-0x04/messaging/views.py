@@ -122,7 +122,7 @@ def get_threaded_message(request, message_id):
 def get_unread_messages(request):
     """Get unread messages for the authenticated user using custom manager."""
     # Use the custom UnreadMessagesManager with .only() optimization
-    unread_messages = Message.unread.for_user(request.user).select_related(
+    unread_messages = Message.unread.unread_for_user(request.user).select_related(
         'sender',
         'receiver'
     ).only(

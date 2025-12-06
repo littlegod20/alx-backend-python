@@ -7,7 +7,7 @@ import uuid
 class UnreadMessagesManager(models.Manager):
     """Custom manager for filtering unread messages."""
     
-    def for_user(self, user):
+    def unread_for_user(self, user):
         """Get unread messages for a specific user."""
         return self.filter(
             receiver=user,

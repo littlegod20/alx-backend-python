@@ -37,6 +37,7 @@ def cleanup_user_data(sender, instance, **kwargs):
     # Delete MessageHistory entries where user is edited_by
     # (These won't be deleted automatically because edited_by uses SET_NULL)
     MessageHistory.objects.filter(edited_by=instance).delete()
+    Message.objects.filter(sender=instance).delete()
     
     # Messages where user is sender or receiver will be deleted via CASCADE
     # When messages are deleted, their MessageHistory entries are also deleted via CASCADE

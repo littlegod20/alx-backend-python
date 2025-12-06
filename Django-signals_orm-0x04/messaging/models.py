@@ -105,6 +105,13 @@ class Message(models.Model):
   content = models.TextField()
   edited = models.BooleanField(default=False)
   timestamp = models.DateTimeField(auto_now_add=True)
+  parent_message = models.ForeignKey(
+      'self',
+      on_delete=models.CASCADE,
+      null=True,
+      blank=True,
+      related_name='replies'
+  )
 
   class Meta:
     db_table = 'message'
@@ -113,7 +120,54 @@ class Message(models.Model):
       models.Index(fields=['sender']),
       models.Index(fields=['receiver']),
       models.Index(fields=['timestamp']),
+      models.Index(fields=['parent_message']),
     ]
+
+  @classmethod
+  def get_threaded_messages(cls, parent_id=None):
+    """Get messages with optimized queries using select_related and prefetch_related."""
+    queryset = cls.objects.select_related(
+        'sender',
+        'receiver',
+        'parent_message',
+        'parent_message__sender',
+        'parent_message__receiver'
+    ).prefetch_related(
+        'replies__sender',
+        'replies__receiver',
+        'replies__replies'
+    )
+    
+    if parent_id is None:
+      # Get top-level messages (no parent)
+      return queryset.filter(parent_message__isnull=True).order_by('timestamp')
+    else:
+      # Get replies to a specific message
+      return queryset.filter(parent_message_id=parent_id).order_by('timestamp')
+
+  def get_all_replies(self, depth=0, max_depth=10):
+    """Recursively get all replies to this message."""
+    if depth > max_depth:
+      return []
+    
+    replies = list(
+        Message.objects.select_related('sender', 'receiver')
+        .filter(parent_message=self)
+        .order_by('timestamp')
+    )
+    
+    result = []
+    for reply in replies:
+      reply_data = {
+        'message': reply,
+        'replies': reply.get_all_replies(depth=depth + 1, max_depth=max_depth)
+      }
+      result.append(reply_data)
+    
+    return result
+
+  def __str__(self):
+    return f"Message from {self.sender.email} to {self.receiver.email}"
 
 
 class MessageHistory(models.Model):

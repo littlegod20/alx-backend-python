@@ -65,6 +65,24 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
+    # Override groups and user_permissions to add related_name
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        related_name='messaging_user_set',
+        related_query_name='messaging_user',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_name='messaging_user_set',
+        related_query_name='messaging_user',
+    )
+
     class Meta:
         db_table = 'user'
         indexes = [
@@ -82,10 +100,41 @@ class User(AbstractUser):
 
 class Message(models.Model):
   message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-  sender = models.ForeignKey(User, on_delete=models.CASCADE)
-  receiver = models.ForeignKey(User, on_delete=models.CASCADE)
+  sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+  receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
   content = models.TextField()
+  edited = models.BooleanField(default=False)
   timestamp = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'message'
+    indexes = [
+      models.Index(fields=['message_id']),
+      models.Index(fields=['sender']),
+      models.Index(fields=['receiver']),
+      models.Index(fields=['timestamp']),
+    ]
+
+
+class MessageHistory(models.Model):
+  """Model to store edit history of messages."""
+  history_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+  message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='history')
+  old_content = models.TextField()
+  edited_at = models.DateTimeField(auto_now_add=True)
+  edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='message_edits')
+
+  class Meta:
+    db_table = 'message_history'
+    indexes = [
+      models.Index(fields=['history_id']),
+      models.Index(fields=['message']),
+      models.Index(fields=['edited_at']),
+    ]
+    ordering = ['-edited_at']
+
+  def __str__(self):
+    return f"History for message {self.message.message_id} at {self.edited_at}"
 
 
 class Notification(models.Model):

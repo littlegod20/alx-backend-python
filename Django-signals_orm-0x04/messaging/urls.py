@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/user/delete/', views.delete_user, name='delete_user'),
     path('api/messages/', views.get_messages, name='get_messages'),
     path('api/messages/<uuid:message_id>/thread/', views.get_threaded_message, name='get_threaded_message'),
+    path('api/messages/unread/', views.get_unread_messages, name='get_unread_messages'),
 ]

@@ -4,6 +4,17 @@ from django.core.validators import RegexValidator
 import uuid
 
 
+class UnreadMessagesManager(models.Manager):
+    """Custom manager for filtering unread messages."""
+    
+    def for_user(self, user):
+        """Get unread messages for a specific user."""
+        return self.filter(
+            receiver=user,
+            read=False
+        )
+
+
 class Role(models.TextChoices):
     """Role choices for users"""
     GUEST = 'guest', 'Guest'
@@ -104,6 +115,7 @@ class Message(models.Model):
   receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
   content = models.TextField()
   edited = models.BooleanField(default=False)
+  read = models.BooleanField(default=False)
   timestamp = models.DateTimeField(auto_now_add=True)
   parent_message = models.ForeignKey(
       'self',
@@ -112,6 +124,10 @@ class Message(models.Model):
       blank=True,
       related_name='replies'
   )
+  
+  # Custom managers
+  objects = models.Manager()  # Default manager
+  unread = UnreadMessagesManager()  # Custom manager for unread messages
 
   class Meta:
     db_table = 'message'
@@ -121,6 +137,7 @@ class Message(models.Model):
       models.Index(fields=['receiver']),
       models.Index(fields=['timestamp']),
       models.Index(fields=['parent_message']),
+      models.Index(fields=['read']),
     ]
 
   @classmethod

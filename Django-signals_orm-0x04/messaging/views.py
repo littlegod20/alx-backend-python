@@ -117,3 +117,40 @@ def get_threaded_message(request, message_id):
             status=404
         )
 
+
+@login_required
+def get_unread_messages(request):
+    """Get unread messages for the authenticated user using custom manager."""
+    # Use the custom UnreadMessagesManager with .only() optimization
+    unread_messages = Message.unread.for_user(request.user).select_related(
+        'sender',
+        'receiver'
+    ).only(
+        'message_id',
+        'sender',
+        'receiver',
+        'content',
+        'timestamp',
+        'edited',
+        'read',
+        'parent_message'
+    ).order_by('-timestamp')
+    
+    messages_data = []
+    for msg in unread_messages:
+        messages_data.append({
+            'message_id': str(msg.message_id),
+            'sender': msg.sender.email,
+            'receiver': msg.receiver.email,
+            'content': msg.content,
+            'timestamp': msg.timestamp.isoformat(),
+            'edited': msg.edited,
+            'read': msg.read,
+            'parent_message_id': str(msg.parent_message.message_id) if msg.parent_message else None,
+        })
+    
+    return JsonResponse({
+        'unread_count': len(messages_data),
+        'messages': messages_data
+    }, status=200)
+

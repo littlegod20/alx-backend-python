@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import cache_page
 from django.db.models import Q
 from .models import User, Message
 
@@ -23,6 +24,7 @@ def delete_user(request):
     )
 
 
+@cache_page(60)
 @login_required
 def get_messages(request):
     """Get messages for the authenticated user with optimized queries."""

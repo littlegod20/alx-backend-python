@@ -2,17 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
 import uuid
-
-
-class UnreadMessagesManager(models.Manager):
-    """Custom manager for filtering unread messages."""
-    
-    def unread_for_user(self, user):
-        """Get unread messages for a specific user."""
-        return self.filter(
-            receiver=user,
-            read=False
-        )
+from .managers import UnreadMessagesManager
 
 
 class Role(models.TextChoices):

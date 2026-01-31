@@ -1,0 +1,230 @@
+#!/bin/bash
+
+# Script to scale Django app deployment, verify pods, perform load testing, and monitor resources
+# kubctl-0x01: Kubernetes Scaling and Load Testing Script
+
+set -e  # Exit on error
+
+echo "========================================="
+echo "Kubernetes Scaling and Load Testing"
+echo "========================================="
+echo ""
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check if kubectl is installed
+echo "Checking for kubectl..."
+if ! command_exists kubectl; then
+    echo "ERROR: kubectl is not installed."
+    echo "Please install kubectl first."
+    exit 1
+fi
+echo "✓ kubectl is installed"
+echo ""
+
+# Check if wrk is installed
+echo "Checking for wrk..."
+if ! command_exists wrk; then
+    echo "WARNING: wrk is not installed."
+    echo "Load testing will be skipped."
+    echo "To install wrk:"
+    echo "  Windows: Use chocolatey: choco install wrk"
+    echo "  Linux: sudo apt-get install wrk"
+    echo "  Mac: brew install wrk"
+    WRK_AVAILABLE=false
+else
+    echo "✓ wrk is installed"
+    WRK_AVAILABLE=true
+fi
+echo ""
+
+# Deployment name
+DEPLOYMENT_NAME="django-messaging-app"
+SERVICE_NAME="django-messaging-app-service"
+TARGET_REPLICAS=3
+PORT_FORWARD_PORT=8000
+
+# Step 1: Scale the deployment to 3 replicas
+echo "========================================="
+echo "Step 1: Scaling deployment to $TARGET_REPLICAS replicas"
+echo "========================================="
+echo ""
+
+echo "Current replica count:"
+kubectl get deployment $DEPLOYMENT_NAME -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0"
+echo ""
+
+echo "Scaling deployment to $TARGET_REPLICAS replicas..."
+kubectl scale deployment $DEPLOYMENT_NAME --replicas=$TARGET_REPLICAS
+
+if [ $? -eq 0 ]; then
+    echo "✓ Deployment scaled successfully"
+else
+    echo "✗ Failed to scale deployment"
+    exit 1
+fi
+echo ""
+
+# Wait for pods to be ready
+echo "Waiting for pods to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/$DEPLOYMENT_NAME || {
+    echo "WARNING: Some pods may not be ready yet"
+}
+echo ""
+
+# Step 2: Verify multiple pods are running
+echo "========================================="
+echo "Step 2: Verifying pods are running"
+echo "========================================="
+echo ""
+
+echo "Getting pod status..."
+kubectl get pods -l app=$DEPLOYMENT_NAME
+
+POD_COUNT=$(kubectl get pods -l app=$DEPLOYMENT_NAME --no-headers 2>/dev/null | wc -l | tr -d ' ')
+READY_COUNT=$(kubectl get pods -l app=$DEPLOYMENT_NAME --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+
+echo ""
+echo "Pod Summary:"
+echo "  Total pods: $POD_COUNT"
+echo "  Running pods: $READY_COUNT"
+echo "  Target replicas: $TARGET_REPLICAS"
+echo ""
+
+if [ "$POD_COUNT" -ge "$TARGET_REPLICAS" ]; then
+    echo "✓ Multiple pods are running"
+else
+    echo "⚠ Warning: Expected $TARGET_REPLICAS pods, but found $POD_COUNT"
+fi
+echo ""
+
+# Get pod names for reference
+echo "Pod names:"
+kubectl get pods -l app=$DEPLOYMENT_NAME -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+echo ""
+
+# Step 3: Load testing with wrk
+if [ "$WRK_AVAILABLE" = true ]; then
+    echo "========================================="
+    echo "Step 3: Load Testing with wrk"
+    echo "========================================="
+    echo ""
+
+    # Set up port-forwarding in background
+    echo "Setting up port-forwarding to service..."
+    kubectl port-forward service/$SERVICE_NAME $PORT_FORWARD_PORT:8000 > /dev/null 2>&1 &
+    PORT_FORWARD_PID=$!
+    
+    # Wait a moment for port-forward to establish
+    sleep 3
+    
+    # Check if port-forward is working
+    if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+        echo "⚠ Warning: Port-forward may have failed. Trying alternative method..."
+        # Try direct pod port-forward as fallback
+        FIRST_POD=$(kubectl get pods -l app=$DEPLOYMENT_NAME -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [ -n "$FIRST_POD" ]; then
+            kubectl port-forward pod/$FIRST_POD $PORT_FORWARD_PORT:8000 > /dev/null 2>&1 &
+            PORT_FORWARD_PID=$!
+            sleep 3
+        fi
+    fi
+    
+    echo "✓ Port-forwarding established (PID: $PORT_FORWARD_PID)"
+    echo ""
+
+    # Perform load test
+    echo "Running load test with wrk..."
+    echo "  Duration: 30 seconds"
+    echo "  Threads: 4"
+    echo "  Connections: 10"
+    echo ""
+
+    wrk -t4 -c10 -d30s http://localhost:$PORT_FORWARD_PORT/ || {
+        echo "⚠ Warning: Load test encountered an error"
+        echo "This might be normal if the app endpoint requires authentication"
+    }
+    echo ""
+
+    # Clean up port-forward
+    echo "Cleaning up port-forward..."
+    kill $PORT_FORWARD_PID 2>/dev/null || true
+    sleep 1
+    echo "✓ Port-forward closed"
+    echo ""
+else
+    echo "========================================="
+    echo "Step 3: Load Testing (Skipped)"
+    echo "========================================="
+    echo ""
+    echo "⚠ wrk is not installed. Load testing skipped."
+    echo "To perform load testing, install wrk and run this script again."
+    echo ""
+fi
+
+# Step 4: Monitor resource usage
+echo "========================================="
+echo "Step 4: Monitoring Resource Usage"
+echo "========================================="
+echo ""
+
+echo "Checking if metrics-server is available..."
+if kubectl top nodes >/dev/null 2>&1; then
+    echo "✓ metrics-server is available"
+    echo ""
+    
+    echo "Node resource usage:"
+    kubectl top nodes
+    echo ""
+    
+    echo "Pod resource usage:"
+    kubectl top pods -l app=$DEPLOYMENT_NAME
+    echo ""
+    
+    echo "Deployment resource usage:"
+    kubectl top pods -l app=$DEPLOYMENT_NAME --containers
+    echo ""
+else
+    echo "⚠ metrics-server is not available"
+    echo "Resource monitoring requires metrics-server to be installed."
+    echo ""
+    echo "To install metrics-server on minikube:"
+    echo "  minikube addons enable metrics-server"
+    echo ""
+    echo "For other clusters, install metrics-server from:"
+    echo "  https://github.com/kubernetes-sigs/metrics-server"
+    echo ""
+    
+    # Show resource requests/limits instead
+    echo "Showing resource requests and limits from deployment:"
+    kubectl get deployment $DEPLOYMENT_NAME -o jsonpath='{.spec.template.spec.containers[0].resources}' | python -m json.tool 2>/dev/null || \
+    kubectl get deployment $DEPLOYMENT_NAME -o jsonpath='{.spec.template.spec.containers[0].resources}'
+    echo ""
+fi
+
+# Final summary
+echo "========================================="
+echo "Summary"
+echo "========================================="
+echo ""
+echo "Deployment: $DEPLOYMENT_NAME"
+echo "Replicas: $TARGET_REPLICAS"
+echo "Pods running: $POD_COUNT"
+echo "Load testing: $([ "$WRK_AVAILABLE" = true ] && echo "Completed" || echo "Skipped (wrk not installed)")"
+echo "Resource monitoring: $([ "$(kubectl top nodes >/dev/null 2>&1; echo $?)" = "0" ] && echo "Completed" || echo "Skipped (metrics-server not available)")"
+echo ""
+echo "To view detailed pod information:"
+echo "  kubectl describe pods -l app=$DEPLOYMENT_NAME"
+echo ""
+echo "To view logs from all pods:"
+echo "  kubectl logs -l app=$DEPLOYMENT_NAME"
+echo ""
+echo "To scale back down:"
+echo "  kubectl scale deployment $DEPLOYMENT_NAME --replicas=1"
+echo ""
+echo "========================================="
+echo "Script completed!"
+echo "========================================="

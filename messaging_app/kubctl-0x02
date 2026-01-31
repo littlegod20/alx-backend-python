@@ -1,0 +1,260 @@
+#!/bin/bash
+
+# Script for blue-green deployment strategy
+# kubctl-0x02: Deploys blue and green versions and checks for errors
+
+set -e  # Exit on error
+
+echo "========================================="
+echo "Blue-Green Deployment Script"
+echo "========================================="
+echo ""
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check if kubectl is installed
+echo "Checking for kubectl..."
+if ! command_exists kubectl; then
+    echo "ERROR: kubectl is not installed."
+    echo "Please install kubectl first."
+    exit 1
+fi
+echo "✓ kubectl is installed"
+echo ""
+
+# Deployment names
+BLUE_DEPLOYMENT="django-messaging-app-blue"
+GREEN_DEPLOYMENT="django-messaging-app-green"
+SERVICE_NAME="django-messaging-app-service"
+
+# Step 1: Deploy Blue version
+echo "========================================="
+echo "Step 1: Deploying Blue version"
+echo "========================================="
+echo ""
+
+echo "Applying blue deployment..."
+kubectl apply -f blue_deployment.yaml
+
+if [ $? -eq 0 ]; then
+    echo "✓ Blue deployment applied successfully"
+else
+    echo "✗ Failed to apply blue deployment"
+    exit 1
+fi
+echo ""
+
+# Wait for blue deployment to be ready
+echo "Waiting for blue deployment to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/$BLUE_DEPLOYMENT || {
+    echo "⚠ Warning: Blue deployment may not be fully ready"
+}
+echo ""
+
+# Step 2: Deploy Green version
+echo "========================================="
+echo "Step 2: Deploying Green version"
+echo "========================================="
+echo ""
+
+echo "Applying green deployment..."
+kubectl apply -f green_deployment.yaml
+
+if [ $? -eq 0 ]; then
+    echo "✓ Green deployment applied successfully"
+else
+    echo "✗ Failed to apply green deployment"
+    exit 1
+fi
+echo ""
+
+# Wait for green deployment to be ready
+echo "Waiting for green deployment to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/$GREEN_DEPLOYMENT || {
+    echo "⚠ Warning: Green deployment may not be fully ready"
+}
+echo ""
+
+# Step 3: Apply/Update Service
+echo "========================================="
+echo "Step 3: Applying Service Configuration"
+echo "========================================="
+echo ""
+
+echo "Applying service configuration..."
+kubectl apply -f kubeservice.yaml
+
+if [ $? -eq 0 ]; then
+    echo "✓ Service applied successfully"
+else
+    echo "✗ Failed to apply service"
+    exit 1
+fi
+echo ""
+
+# Step 4: Check deployment status
+echo "========================================="
+echo "Step 4: Deployment Status"
+echo "========================================="
+echo ""
+
+echo "Blue deployment status:"
+kubectl get deployment $BLUE_DEPLOYMENT
+echo ""
+
+echo "Green deployment status:"
+kubectl get deployment $GREEN_DEPLOYMENT
+echo ""
+
+echo "Service status:"
+kubectl get service $SERVICE_NAME
+echo ""
+
+echo "All pods:"
+kubectl get pods -l app=django-messaging-app
+echo ""
+
+# Step 5: Check logs for errors in Green version (new version)
+echo "========================================="
+echo "Step 5: Checking Green Version Logs for Errors"
+echo "========================================="
+echo ""
+
+GREEN_PODS=$(kubectl get pods -l app=django-messaging-app,version=green -o jsonpath='{.items[*].metadata.name}')
+
+if [ -z "$GREEN_PODS" ]; then
+    echo "⚠ Warning: No green pods found"
+else
+    echo "Green pods found: $GREEN_PODS"
+    echo ""
+    
+    ERROR_COUNT=0
+    for POD in $GREEN_PODS; do
+        echo "----------------------------------------"
+        echo "Checking logs for pod: $POD"
+        echo "----------------------------------------"
+        echo ""
+        
+        # Get recent logs
+        echo "Recent logs (last 50 lines):"
+        kubectl logs $POD --tail=50 || {
+            echo "⚠ Warning: Could not retrieve logs for $POD"
+            ERROR_COUNT=$((ERROR_COUNT + 1))
+        }
+        echo ""
+        
+        # Check for common error patterns
+        echo "Checking for errors in logs..."
+        ERROR_LOG=$(kubectl logs $POD --tail=100 2>&1 | grep -i -E "(error|exception|traceback|failed|fatal)" || true)
+        
+        if [ -n "$ERROR_LOG" ]; then
+            echo "⚠ ERRORS FOUND in pod $POD:"
+            echo "$ERROR_LOG" | head -20
+            ERROR_COUNT=$((ERROR_COUNT + 1))
+        else
+            echo "✓ No obvious errors found in pod $POD"
+        fi
+        echo ""
+        
+        # Check pod status
+        POD_STATUS=$(kubectl get pod $POD -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        if [ "$POD_STATUS" != "Running" ]; then
+            echo "⚠ Warning: Pod $POD is in status: $POD_STATUS"
+            ERROR_COUNT=$((ERROR_COUNT + 1))
+            
+            # Show pod events for troubleshooting
+            echo "Pod events:"
+            kubectl describe pod $POD | grep -A 10 "Events:" || true
+        else
+            echo "✓ Pod $POD is Running"
+        fi
+        echo ""
+    done
+    
+    if [ $ERROR_COUNT -eq 0 ]; then
+        echo "✓ Green version appears to be healthy (no errors detected)"
+    else
+        echo "⚠ Warning: Found $ERROR_COUNT issue(s) with green version"
+        echo "Review the logs above before switching traffic"
+    fi
+fi
+echo ""
+
+# Step 6: Compare Blue and Green versions
+echo "========================================="
+echo "Step 6: Version Comparison"
+echo "========================================="
+echo ""
+
+BLUE_PODS=$(kubectl get pods -l app=django-messaging-app,version=blue -o jsonpath='{.items[*].metadata.name}')
+GREEN_PODS=$(kubectl get pods -l app=django-messaging-app,version=green -o jsonpath='{.items[*].metadata.name}')
+
+echo "Blue version pods:"
+if [ -n "$BLUE_PODS" ]; then
+    for POD in $BLUE_PODS; do
+        STATUS=$(kubectl get pod $POD -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        echo "  - $POD: $STATUS"
+    done
+else
+    echo "  (no pods found)"
+fi
+echo ""
+
+echo "Green version pods:"
+if [ -n "$GREEN_PODS" ]; then
+    for POD in $GREEN_PODS; do
+        STATUS=$(kubectl get pod $POD -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        echo "  - $POD: $STATUS"
+    done
+else
+    echo "  (no pods found)"
+fi
+echo ""
+
+# Step 7: Show current service routing
+echo "========================================="
+echo "Step 7: Current Service Configuration"
+echo "========================================="
+echo ""
+
+CURRENT_VERSION=$(kubectl get service $SERVICE_NAME -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "unknown")
+echo "Service is currently routing traffic to: $CURRENT_VERSION version"
+echo ""
+
+# Final summary
+echo "========================================="
+echo "Deployment Summary"
+echo "========================================="
+echo ""
+echo "Blue deployment: $BLUE_DEPLOYMENT"
+echo "Green deployment: $GREEN_DEPLOYMENT"
+echo "Service: $SERVICE_NAME"
+echo "Current active version: $CURRENT_VERSION"
+echo ""
+
+if [ $ERROR_COUNT -eq 0 ] && [ -n "$GREEN_PODS" ]; then
+    echo "✓ Green version deployment completed successfully"
+    echo ""
+    echo "To switch traffic to green version, run:"
+    echo "  kubectl patch service $SERVICE_NAME -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"
+    echo ""
+    echo "Or edit kubeservice.yaml and change selector to:"
+    echo "  version: green"
+    echo "Then apply: kubectl apply -f kubeservice.yaml"
+else
+    echo "⚠ Please review the errors above before switching traffic"
+fi
+echo ""
+
+echo "Useful commands:"
+echo "  View blue logs: kubectl logs -l app=django-messaging-app,version=blue"
+echo "  View green logs: kubectl logs -l app=django-messaging-app,version=green"
+echo "  Switch to green: kubectl patch service $SERVICE_NAME -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"
+echo "  Switch to blue: kubectl patch service $SERVICE_NAME -p '{\"spec\":{\"selector\":{\"version\":\"blue\"}}}'"
+echo ""
+echo "========================================="
+echo "Script completed!"
+echo "========================================="

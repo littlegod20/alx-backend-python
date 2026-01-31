@@ -1,0 +1,64 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: django-messaging-app-ingress
+  labels:
+    app: django-messaging-app
+  annotations:
+    # Nginx Ingress Controller annotations
+    # Note: rewrite-target is not needed here as we want to preserve the full path for Django
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Enable CORS if needed for API access
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+spec:
+  ingressClassName: nginx
+  rules:
+  # Option 1: Path-based routing (recommended for API)
+  - http:
+      paths:
+      # Route /api/* to Django API
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: django-messaging-app-service
+            port:
+              number: 8000
+      # Route /admin/* to Django admin
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: django-messaging-app-service
+            port:
+              number: 8000
+      # Route /api-auth/* to Django REST framework auth
+      - path: /api-auth
+        pathType: Prefix
+        backend:
+          service:
+            name: django-messaging-app-service
+            port:
+              number: 8000
+      # Route root path to Django app
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: django-messaging-app-service
+            port:
+              number: 8000
+  # Option 2: Host-based routing (uncomment and configure if you have a domain)
+  # - host: api.messaging-app.local
+  #   http:
+  #     paths:
+  #     - path: /
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: django-messaging-app-service
+  #           port:
+  #             number: 8000

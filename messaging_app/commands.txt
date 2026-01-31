@@ -1,0 +1,39 @@
+# Commands to install Nginx Ingress Controller and apply Ingress configuration
+
+# 1. Install Nginx Ingress Controller
+# For Kubernetes (standard installation):
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+# For Minikube (alternative method):
+# minikube addons enable ingress
+
+# Wait for the ingress controller to be ready
+kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=300s
+
+# 2. Verify Ingress Controller is installed
+kubectl get pods -n ingress-nginx
+
+# 3. Get the external IP or use port-forward for local testing
+# For Minikube, get the ingress IP:
+# minikube ip
+
+# For cloud providers, get the LoadBalancer IP:
+# kubectl get svc -n ingress-nginx
+
+# 4. Apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# 5. Verify the Ingress resource was created
+kubectl get ingress
+
+# 6. Check detailed Ingress information
+kubectl describe ingress django-messaging-app-ingress
+
+# 7. For local testing with Minikube, enable ingress addon and get IP:
+# minikube addons enable ingress
+# minikube ip
+# Then access the app at: http://<minikube-ip>/api/
+
+# 8. For local testing without a domain, use port-forward to ingress controller:
+# kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
+# Then access the app at: http://localhost:8080/api/

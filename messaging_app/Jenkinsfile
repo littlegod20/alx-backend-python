@@ -16,6 +16,12 @@ pipeline {
         TEST_REPORT_DIR = 'test-reports'
         // Coverage report directory
         COVERAGE_REPORT_DIR = 'coverage-reports'
+        // Docker configuration
+        DOCKER_HUB_REPO = 'littlegod20'
+        DOCKER_IMAGE_NAME = 'django-messaging-app'
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_IMAGE_FULL = "${DOCKER_HUB_REPO}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+        DOCKER_IMAGE_LATEST = "${DOCKER_HUB_REPO}/${DOCKER_IMAGE_NAME}:latest"
     }
     
     stages {
@@ -220,6 +226,73 @@ pipeline {
                 }
             }
         }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo 'Building Docker image...'
+                    echo "Image: ${DOCKER_IMAGE_FULL}"
+                    echo "Latest tag: ${DOCKER_IMAGE_LATEST}"
+                    
+                    // Navigate to project directory where Dockerfile is located
+                    dir("${PROJECT_DIR}") {
+                        // Build Docker image with multiple tags
+                        sh """
+                            docker build -t ${DOCKER_IMAGE_FULL} -t ${DOCKER_IMAGE_LATEST} .
+                        """
+                        
+                        echo "✓ Docker image built successfully"
+                        echo "  - ${DOCKER_IMAGE_FULL}"
+                        echo "  - ${DOCKER_IMAGE_LATEST}"
+                        
+                        // List the built images
+                        sh """
+                            docker images | grep ${DOCKER_IMAGE_NAME} || true
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    echo 'Pushing Docker image to Docker Hub...'
+                    echo "Using credentials: docker-hub-credentials"
+                    
+                    // Login to Docker Hub using credentials
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-hub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                            echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
+                        """
+                        
+                        // Push both tags
+                        dir("${PROJECT_DIR}") {
+                            sh """
+                                echo "Pushing image: ${DOCKER_IMAGE_FULL}"
+                                docker push ${DOCKER_IMAGE_FULL}
+                                
+                                echo "Pushing image: ${DOCKER_IMAGE_LATEST}"
+                                docker push ${DOCKER_IMAGE_LATEST}
+                            """
+                        }
+                        
+                        // Logout from Docker Hub
+                        sh """
+                            docker logout
+                        """
+                    }
+                    
+                    echo "✓ Docker image pushed successfully to Docker Hub"
+                    echo "  - ${DOCKER_IMAGE_FULL}"
+                    echo "  - ${DOCKER_IMAGE_LATEST}"
+                }
+            }
+        }
     }
     
     post {
@@ -235,6 +308,9 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded! ✅'
+            echo "Docker image built and pushed:"
+            echo "  - ${DOCKER_IMAGE_FULL}"
+            echo "  - ${DOCKER_IMAGE_LATEST}"
             // Archive test reports
             archiveArtifacts artifacts: "${PROJECT_DIR}/${TEST_REPORT_DIR}/**/*, ${PROJECT_DIR}/${COVERAGE_REPORT_DIR}/**/*", allowEmptyArchive: true
         }

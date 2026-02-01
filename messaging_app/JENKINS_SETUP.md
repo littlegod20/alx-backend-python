@@ -60,6 +60,26 @@ Install the following plugins via Jenkins Dashboard → Manage Jenkins → Manag
 2. Generate new token with `repo` scope
 3. Copy the token and use it as the password in Jenkins credentials
 
+## Step 4b: Configure Docker Hub Credentials
+
+1. Go to Jenkins Dashboard → Manage Jenkins → Manage Credentials
+2. Click on "System" → "Global credentials"
+3. Click "Add Credentials"
+4. Configure:
+   - **Kind**: Username with password
+   - **Username**: Your Docker Hub username (e.g., `littlegod20`)
+   - **Password**: Your Docker Hub password or access token
+   - **ID**: `docker-hub-credentials` (must match Jenkinsfile)
+   - **Description**: Docker Hub credentials for pushing images
+
+### Creating Docker Hub Access Token (Recommended)
+
+1. Go to Docker Hub → Account Settings → Security
+2. Click "New Access Token"
+3. Give it a description (e.g., "Jenkins CI/CD")
+4. Copy the token and use it as the password in Jenkins credentials
+5. Note: Access tokens are more secure than using your Docker Hub password
+
 ## Step 5: Update Jenkinsfile
 
 Before using the pipeline, update the Jenkinsfile with your GitHub repository URL:

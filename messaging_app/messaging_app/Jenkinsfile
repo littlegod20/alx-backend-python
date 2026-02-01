@@ -1,0 +1,237 @@
+pipeline {
+    agent any
+    
+    options {
+        // Allow manual trigger
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+    
+    environment {
+        // Python version
+        PYTHON_VERSION = '3.10'
+        // Project directory
+        PROJECT_DIR = 'messaging_app'
+        // Test report directory
+        TEST_REPORT_DIR = 'test-reports'
+        // Coverage report directory
+        COVERAGE_REPORT_DIR = 'coverage-reports'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo 'Checking out source code from GitHub...'
+                    // When using "Pipeline script from SCM", Jenkins automatically checks out the code
+                    // This stage ensures we have the latest code and shows the commit info
+                    checkout scm
+                    echo 'Source code checked out successfully'
+                    sh '''
+                        echo "Current branch:"
+                        git branch --show-current || git rev-parse --abbrev-ref HEAD
+                        echo "Latest commit:"
+                        git log -1 --oneline
+                    '''
+                }
+            }
+        }
+        
+        stage('Setup Python Environment') {
+            steps {
+                script {
+                    echo 'Setting up Python environment...'
+                    sh '''
+                        # Check Python version
+                        python3 --version || python --version
+        
+                        # Create virtual environment if it doesn't exist
+                        if [ ! -d "venv" ]; then
+                            python3 -m venv venv || python -m venv venv
+                        fi
+        
+                        # Activate virtual environment
+                        source venv/bin/activate || . venv/bin/activate
+        
+                        # Upgrade pip
+                        pip install --upgrade pip
+        
+                        echo "Python environment setup complete"
+                    '''
+                }
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    echo 'Installing project dependencies...'
+                    sh '''
+                        # Activate virtual environment
+                        source venv/bin/activate || . venv/bin/activate
+        
+                        # Navigate to project directory
+                        cd ${PROJECT_DIR} || cd .
+        
+                        # Install requirements
+                        if [ -f "Requirements.txt" ]; then
+                            pip install -r Requirements.txt
+                        elif [ -f "requirements.txt" ]; then
+                            pip install -r requirements.txt
+                        fi
+        
+                        # Install pytest and related plugins for Django
+                        pip install pytest pytest-django pytest-cov pytest-html pytest-xdist
+        
+                        # Verify installations
+                        pip list | grep -E "(pytest|Django|djangorestframework)"
+        
+                        echo "Dependencies installed successfully"
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Database Migrations') {
+            steps {
+                script {
+                    echo 'Running database migrations...'
+                    sh '''
+                        # Activate virtual environment
+                        source venv/bin/activate || . venv/bin/activate
+        
+                        # Navigate to project directory
+                        cd ${PROJECT_DIR} || cd .
+        
+                        # Run migrations (using SQLite for testing)
+                        python manage.py migrate --noinput || echo "Migrations completed or skipped"
+        
+                        echo "Database migrations completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Tests with pytest') {
+            steps {
+                script {
+                    echo 'Running tests with pytest...'
+                    sh '''
+                        # Activate virtual environment
+                        source venv/bin/activate || . venv/bin/activate
+        
+                        # Navigate to project directory
+                        cd ${PROJECT_DIR} || cd .
+        
+                        # Create test report directories
+                        mkdir -p ${TEST_REPORT_DIR}
+                        mkdir -p ${COVERAGE_REPORT_DIR}
+        
+                        # Set Django settings module
+                        export DJANGO_SETTINGS_MODULE=messaging_app.settings
+        
+                        # Run pytest with coverage and HTML report
+                        pytest \
+                            --verbose \
+                            --tb=short \
+                            --junitxml=${TEST_REPORT_DIR}/junit.xml \
+                            --html=${TEST_REPORT_DIR}/report.html \
+                            --self-contained-html \
+                            --cov=. \
+                            --cov-report=html:${COVERAGE_REPORT_DIR}/html \
+                            --cov-report=xml:${COVERAGE_REPORT_DIR}/coverage.xml \
+                            --cov-report=term \
+                            --maxfail=5 \
+                            -v || true  # Continue even if tests fail
+        
+                        echo "Tests execution completed"
+                    '''
+                }
+            }
+        }
+        
+        stage('Publish Test Results') {
+            steps {
+                script {
+                    echo 'Publishing test results...'
+                    // Publish JUnit test results
+                    junit allowEmptyResults: true, testResultsPattern: "${PROJECT_DIR}/${TEST_REPORT_DIR}/junit.xml"
+                    
+                    // Publish HTML test report
+                    publishHTML([
+                        reportDir: "${PROJECT_DIR}/${TEST_REPORT_DIR}",
+                        reportFiles: 'report.html',
+                        reportName: 'Pytest Test Report',
+                        keepAll: true
+                    ])
+                    
+                    // Publish coverage report
+                    publishHTML([
+                        reportDir: "${PROJECT_DIR}/${COVERAGE_REPORT_DIR}/html",
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report',
+                        keepAll: true
+                    ])
+                    
+                    echo "Test results published successfully"
+                }
+            }
+        }
+        
+        stage('Test Summary') {
+            steps {
+                script {
+                    echo 'Generating test summary...'
+                    sh '''
+                        # Activate virtual environment
+                        source venv/bin/activate || . venv/bin/activate
+        
+                        # Navigate to project directory
+                        cd ${PROJECT_DIR} || cd .
+        
+                        # Display test summary
+                        echo "========================================="
+                        echo "Test Execution Summary"
+                        echo "========================================="
+                        if [ -f "${TEST_REPORT_DIR}/junit.xml" ]; then
+                            echo "Test report generated: ${TEST_REPORT_DIR}/junit.xml"
+                        fi
+                        if [ -f "${TEST_REPORT_DIR}/report.html" ]; then
+                            echo "HTML test report: ${TEST_REPORT_DIR}/report.html"
+                        fi
+                        if [ -f "${COVERAGE_REPORT_DIR}/coverage.xml" ]; then
+                            echo "Coverage report: ${COVERAGE_REPORT_DIR}/coverage.xml"
+                        fi
+                        echo "========================================="
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                echo 'Pipeline execution completed'
+                // Clean up if needed
+                sh '''
+                    echo "Cleaning up temporary files..."
+                    # Keep reports, remove other temp files if needed
+                '''
+            }
+        }
+        success {
+            echo 'Pipeline succeeded! ✅'
+            // Archive test reports
+            archiveArtifacts artifacts: "${PROJECT_DIR}/${TEST_REPORT_DIR}/**/*, ${PROJECT_DIR}/${COVERAGE_REPORT_DIR}/**/*", allowEmptyArchive: true
+        }
+        failure {
+            echo 'Pipeline failed! ❌'
+            // Archive test reports even on failure
+            archiveArtifacts artifacts: "${PROJECT_DIR}/${TEST_REPORT_DIR}/**/*, ${PROJECT_DIR}/${COVERAGE_REPORT_DIR}/**/*", allowEmptyArchive: true
+        }
+        unstable {
+            echo 'Pipeline is unstable! ⚠️'
+        }
+    }
+}

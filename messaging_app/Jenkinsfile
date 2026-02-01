@@ -23,9 +23,16 @@ pipeline {
             steps {
                 script {
                     echo 'Checking out source code from GitHub...'
-                    // When using "Pipeline script from SCM", Jenkins automatically checks out the code
-                    // This stage ensures we have the latest code and shows the commit info
-                    checkout scm
+                    // Checkout from GitHub with credentials
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']], // Change to your branch name if different
+                        extensions: [],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/YOUR_USERNAME/alx-backend-python.git', // Update with your GitHub URL
+                            credentialsId: 'github-credentials' // GitHub credentials configured in Jenkins
+                        ]]
+                    ])
                     echo 'Source code checked out successfully'
                     sh '''
                         echo "Current branch:"
@@ -54,7 +61,7 @@ pipeline {
                         source venv/bin/activate || . venv/bin/activate
         
                         # Upgrade pip
-                        pip install --upgrade pip
+                        pip3 install --upgrade pip
         
                         echo "Python environment setup complete"
                     '''
@@ -73,18 +80,24 @@ pipeline {
                         # Navigate to project directory
                         cd ${PROJECT_DIR} || cd .
         
-                        # Install requirements
-                        if [ -f "Requirements.txt" ]; then
-                            pip install -r Requirements.txt
-                        elif [ -f "requirements.txt" ]; then
-                            pip install -r requirements.txt
+                        # Install requirements from messaging_app/requirements.txt
+                        if [ -f "requirements.txt" ]; then
+                            pip3 install -r requirements.txt
+                        elif [ -f "Requirements.txt" ]; then
+                            pip3 install -r Requirements.txt
+                        elif [ -f "../messaging_app/requirements.txt" ]; then
+                            pip3 install -r ../messaging_app/requirements.txt
+                        elif [ -f "../messaging_app/Requirements.txt" ]; then
+                            pip3 install -r ../messaging_app/Requirements.txt
+                        else
+                            echo "Warning: messaging_app/requirements.txt not found, installing pytest only"
                         fi
         
                         # Install pytest and related plugins for Django
-                        pip install pytest pytest-django pytest-cov pytest-html pytest-xdist
+                        pip3 install pytest pytest-django pytest-cov pytest-html pytest-xdist
         
                         # Verify installations
-                        pip list | grep -E "(pytest|Django|djangorestframework)"
+                        pip3 list | grep -E "(pytest|Django|djangorestframework)"
         
                         echo "Dependencies installed successfully"
                     '''
